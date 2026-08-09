@@ -8,37 +8,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Extraer proyecto
+      - name: Comprobar archivo Bridge V3
+        run: |
+          echo "Archivos del repositorio:"
+          ls -lah
+          echo ""
+          echo "Comprobando Bridge V3..."
+
+          if [ ! -f "WebTV_Android_BRIDGE_V3.zip" ]; then
+            echo "ERROR: No se encontró WebTV_Android_BRIDGE_V3.zip"
+            exit 1
+          fi
+
+          echo "Bridge V3 encontrado correctamente."
+
+      - name: Preparar carpeta del proyecto
         run: |
           rm -rf project
           mkdir -p project
-          unzip -q WebTV_Android_BRIDGE_V2.zip -d project
 
-      - name: Encontrar proyecto Gradle
-        id: find-project
-        shell: bash
+      - name: Extraer Bridge V3
         run: |
+          unzip -q "WebTV_Android_BRIDGE_V3.zip" -d project
+
+      - name: Encontrar proyecto Android
+        run: |
+          echo "Buscando settings.gradle..."
+
           PROJECT_DIR=$(find "$GITHUB_WORKSPACE/project" \
             -type f \
             \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
             -print -quit | xargs -r dirname)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: No se encontró settings.gradle.kts ni settings.gradle"
+            echo "ERROR: No se encontró un proyecto Gradle."
+            echo ""
             echo "Contenido extraído:"
             find "$GITHUB_WORKSPACE/project" -maxdepth 5 -type f | sort
             exit 1
           fi
 
-          echo "Proyecto Gradle encontrado en:"
+          echo "Proyecto encontrado en:"
           echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Configurar Java
+      - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -47,7 +65,7 @@ jobs:
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Instalar SDK Android
+      - name: Instalar Android SDK
         run: |
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
@@ -56,22 +74,40 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Verificar proyecto
+      - name: Verificar proyecto Android
         run: |
-          echo "=== PROYECTO ==="
+          echo "================================"
+          echo "PROYECTO:"
           echo "$PROJECT_DIR"
-          echo "=== ARCHIVOS ==="
-          ls -la "$PROJECT_DIR"
-          echo "=== APP ==="
-          ls -la "$PROJECT_DIR/app"
+          echo "================================"
+
+          echo ""
+          echo "Archivos principales:"
+          ls -lah "$PROJECT_DIR"
+
+          echo ""
+          echo "Carpeta app:"
+          ls -lah "$PROJECT_DIR/app"
 
       - name: Compilar APK
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           gradle assembleDebug --stacktrace
 
-      - name: Guardar APK
+      - name: Comprobar APK generado
+        run: |
+          APK_PATH="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$APK_PATH" ]; then
+            echo "ERROR: No se generó el APK."
+            exit 1
+          fi
+
+          echo "APK generado correctamente:"
+          ls -lh "$APK_PATH"
+
+      - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: WebTV-APK
+          name: WebTV-Bridge-V3-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
