@@ -1,4 +1,4 @@
-name: Build WebTV APK
+name: Build WebTV Bridge V4
 
 on:
   workflow_dispatch:
@@ -11,47 +11,40 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Comprobar archivo Bridge V3
+      - name: Comprobar ZIP V4
         run: |
           echo "Archivos del repositorio:"
           ls -lah
-          echo ""
-          echo "Comprobando Bridge V3..."
 
-          if [ ! -f "WebTV_Android_BRIDGE_V3.zip" ]; then
-            echo "ERROR: No se encontró WebTV_Android_BRIDGE_V3.zip"
+          if [ ! -f "WebTV_Android_BRIDGE_V4_READY.zip" ]; then
+            echo "ERROR: No se encontró WebTV_Android_BRIDGE_V4_READY.zip"
             exit 1
           fi
 
-          echo "Bridge V3 encontrado correctamente."
+          echo "ZIP V4 encontrado correctamente."
 
-      - name: Preparar carpeta del proyecto
+      - name: Preparar proyecto
         run: |
           rm -rf project
           mkdir -p project
+          unzip -q "WebTV_Android_BRIDGE_V4_READY.zip" -d project
 
-      - name: Extraer Bridge V3
+      - name: Encontrar proyecto Gradle
         run: |
-          unzip -q "WebTV_Android_BRIDGE_V3.zip" -d project
-
-      - name: Encontrar proyecto Android
-        run: |
-          echo "Buscando settings.gradle..."
-
           PROJECT_DIR=$(find "$GITHUB_WORKSPACE/project" \
             -type f \
             \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
             -print -quit | xargs -r dirname)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: No se encontró un proyecto Gradle."
+            echo "ERROR: No se encontró settings.gradle.kts ni settings.gradle."
             echo ""
-            echo "Contenido extraído:"
+            echo "Contenido del ZIP:"
             find "$GITHUB_WORKSPACE/project" -maxdepth 5 -type f | sort
             exit 1
           fi
 
-          echo "Proyecto encontrado en:"
+          echo "Proyecto encontrado:"
           echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
@@ -74,17 +67,13 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Verificar proyecto Android
+      - name: Verificar proyecto
         run: |
-          echo "================================"
-          echo "PROYECTO:"
+          echo "Proyecto:"
           echo "$PROJECT_DIR"
-          echo "================================"
-
           echo ""
-          echo "Archivos principales:"
+          echo "Contenido:"
           ls -lah "$PROJECT_DIR"
-
           echo ""
           echo "Carpeta app:"
           ls -lah "$PROJECT_DIR/app"
@@ -94,20 +83,20 @@ jobs:
         run: |
           gradle assembleDebug --stacktrace
 
-      - name: Comprobar APK generado
+      - name: Comprobar APK
         run: |
-          APK_PATH="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 
-          if [ ! -f "$APK_PATH" ]; then
+          if [ ! -f "$APK" ]; then
             echo "ERROR: No se generó el APK."
             exit 1
           fi
 
           echo "APK generado correctamente:"
-          ls -lh "$APK_PATH"
+          ls -lh "$APK"
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: WebTV-Bridge-V3-APK
+          name: WebTV-Bridge-V4-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
